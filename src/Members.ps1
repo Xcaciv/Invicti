@@ -1,10 +1,10 @@
 #Requires -Version 3
 <#
 .SYNOPSIS
-  Do things with members
+  Do things with Invicti members
 .DESCRIPTION
   Mass edit members
-.PARAMETER <Parameter_Name>
+.PARAMETER action
     <Brief description of parameter input required. Repeat this attribute if required>
 .INPUTS
   <Inputs if any, otherwise state None>
@@ -23,12 +23,35 @@
 
 #--------[Params]---------------
 Param(
-  [Parameter(Mandatory=$true)]
-  [ValidationSet('info')]
-  [string]$Action,
+  [Parameter()]
+  [ValidationSet('delete', 
+    'deleteinvitation', 
+    'get', 
+    'getapitoken', 
+    'getbyemail', 
+    'getinvitation', 
+    'gettimezones', 
+    'invitationlist', 
+    'list', 
+    'new', 
+    'newinvitation', 
+    'sendinvitationemail',
+    'update'
+    )]
+  [string]$Action='list',
 
   [Parameter()]
-  [string]$Url='https://www.netsparkercloud.com/'
+  [int]$Id='',
+
+  [Parameter()]
+  [string]$Url='https://www.netsparkercloud.com/api/',
+
+  [Parameter()]
+  [ValidationSet('1.0')]
+  [string]$ApiVersion='1.0',
+
+  [Parameter()]
+  [string]$Subject='members'
 )
 
 #if (-not($PSBoundParameters.ContainsKey("MyParam"))) {
@@ -57,5 +80,5 @@ finally
 {
     Set-Location $startingLoc
     [System.Environment]::CurrentDirectory = $startingDir
-    Write-Output "Done. Elapsed time: $($stopwatch.Elapsed)"
+    Write-Output "Done. ET: $($stopwatch.Elapsed)"
 }
