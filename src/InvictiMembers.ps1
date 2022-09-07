@@ -37,6 +37,9 @@ Param(
   [Object]$Member,
 
   [Parameter()]
+  [string]$DisableMemberList,
+
+  [Parameter()]
   [string]
   $BaseUrl='https://www.netsparkercloud.com/api/',
 
@@ -147,7 +150,7 @@ function Disable-InvictiMember {
     $Member.State = 'Disabled'
     $Member | Add-Member -MemberType NoteProperty -Name 'AutoGeneratePassword' -Value $true
 
-    $Body = $Member | ConvertTo-Json 
+    $Body = ConvertTo-Json -Depth 10 -InputObject $Member
     $Verb = 'POST'
     $Action = 'update'
 
@@ -195,13 +198,29 @@ elseif ($null -eq $Verb -or $Verb -eq '')
 
 try
 {
-
+  
   if ($null -eq $Member)
   {
     $Body = ''
   }
   else {
     $Body = $Member | ConvertTo-Json
+  }
+
+  if ($null -eq $DisableMemberList)
+  {
+    $emailRegex = '\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*';
+    foreach($line in Get-Content -Path $DisableMemberList)
+    {
+      if($line -match $emailRegex)
+      {
+        $Member = Get-InvictiMember $line "${BaseUrl}${ApiVersion}" $Verb $Body $Credential
+        $result = Disable-InvictiMember $Member "${BaseUrl}${ApiVersion}/${Subject}" $Credential
+        Write-Debug $result
+        Write-Verbose "Disabled ${line}"
+      }
+    }
+    return
   }
   
   if ($null -ne $Email -and $null -eq $Member) {
@@ -211,26 +230,15 @@ try
     }
   }
 
+  # special functions
   if ($Action -eq 'disablemember')
   {
-    # $Member.State = 'Disabled'
-    # $Member | Add-Member -MemberType NoteProperty -Name 'AutoGeneratePassword' -Value $true
-
-    # $Body = $Member | ConvertTo-Json 
-    # $Verb = 'POST'
-    # $Action = 'update'
-
-    # Write-Debug "BODY: ${Body}" 
-
-    # $Uri = "${BaseUrl}${ApiVersion}/${Subject}/${Action}"
-    # return CallInvictiAPI $Uri $Verb $Body $Credential
     return Disable-InvictiMember $Member "${BaseUrl}${ApiVersion}/${Subject}" $Credential
   }
   
+  # normal function
   $Uri = "${BaseUrl}${ApiVersion}/${Subject}/${Action}"
-  $Response = CallInvictiAPI $Uri $Verb $Body $Credential 
-  
-  return $Response
+  return CallInvictiAPI $Uri $Verb $Body $Credential 
 }
 finally
 {
