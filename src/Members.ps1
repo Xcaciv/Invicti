@@ -1,4 +1,4 @@
-#Requires -Version 3
+#Requires -Version 4
 <#
 .SYNOPSIS
   Do things with Invicti members
@@ -24,39 +24,138 @@
 #--------[Params]---------------
 Param(
   [Parameter()]
-  [ValidationSet('delete', 
-    'deleteinvitation', 
-    'get', 
-    'getapitoken', 
-    'getbyemail', 
-    'getinvitation', 
-    'gettimezones', 
-    'invitationlist', 
-    'list', 
-    'new', 
-    'newinvitation', 
-    'sendinvitationemail',
-    'update'
-    )]
+  [ValidateSet('delete', 'deleteinvitation', 'get', 'getapitoken', 'getbyemail', 'getinvitation', 'gettimezones', 'invitationlist', 'list', 'new', 'newinvitation', 'sendinvitationemail', 'update', 'disablemember' )]
   [string]$Action='list',
 
   [Parameter()]
-  [int]$Id='',
+  [int]$Id,
 
   [Parameter()]
-  [string]$Url='https://www.netsparkercloud.com/api/',
+  [string]$Email,
 
   [Parameter()]
-  [ValidationSet('1.0')]
-  [string]$ApiVersion='1.0',
+  [Object]$Member,
 
   [Parameter()]
-  [string]$Subject='members'
+  [string]
+  $BaseUrl='https://www.netsparkercloud.com/api/',
+
+  [Parameter()]
+  [ValidateSet('1.0')]
+  [string]
+  $ApiVersion='1.0',
+
+  [Parameter()]
+  [string]
+  $Subject='members',
+
+  [Parameter()]
+  [string]
+  [ValidateSet('POST','GET')]
+  $Verb,
+
+  [Parameter()]
+  [System.Management.Automation.PSCredential]
+  $Credential = [System.Management.Automation.PSCredential]::Empty
 )
 
-#if (-not($PSBoundParameters.ContainsKey("MyParam"))) {
-#   Write-Output "Value from pipeline"
-#}
+function CallInvictiAPI {
+  [CmdletBinding()]
+  Param(
+    [Parameter(Mandatory)]
+    [string]
+    $Uri,
+
+    [Parameter()]
+    [string]
+    [ValidateSet('POST', 'GET')]
+    $Verb,
+
+    [Parameter()]
+    [string]$JsonBody,
+
+    [Parameter()]
+    [ValidateNotNull()]
+    [System.Management.Automation.PSCredential]
+    [System.Management.Automation.Credential()]
+    $Credential = [System.Management.Automation.PSCredential]::Empty
+  )
+
+  
+  Write-Debug "calling ${Verb} :: ${Uri}"
+
+  $Parameters = @{
+    Method = $Verb
+    Uri = $Uri
+    Body = $JsonBody
+    ContentType = 'application/json'
+    Authentication = "Basic"
+    Credential = $Credential
+  }
+
+  Invoke-RestMethod @Parameters
+}
+
+function Get-InvictiMember {
+  [CmdletBinding()]
+  Param(
+    [Parameter(Mandatory)]
+    [string]
+    $Email,
+
+    [Parameter(Mandatory)]
+    [string]
+    $Uri,
+
+    [Parameter()]
+    [string]
+    [ValidateSet('POST', 'GET')]
+    $Verb,
+
+    [Parameter()]
+    [string]$Body,
+
+    [Parameter()]
+    [ValidateNotNull()]
+    [System.Management.Automation.PSCredential]
+    [System.Management.Automation.Credential()]
+    $Credential = [System.Management.Automation.PSCredential]::Empty
+  )
+
+  $Uri += "/members/getbyemail?email=" + [System.Web.HttpUtility]::UrlEncode($Email)
+  CallInvictiAPI $Uri $Verb $Body $Credential
+}
+
+function Disable-InvictiMember {
+  [CmdletBinding()]
+  Param(
+    [Parameter(Mandatory)]
+    [PSObject]
+    $Member,
+
+    [Parameter(Mandatory)]
+    [string]
+    $Uri,
+
+    [Parameter()]
+    [ValidateNotNull()]
+    [System.Management.Automation.PSCredential]
+    [System.Management.Automation.Credential()]
+    $Credential = [System.Management.Automation.PSCredential]::Empty
+  )
+
+    $Member.State = 'Disabled'
+    $Member | Add-Member -MemberType NoteProperty -Name 'AutoGeneratePassword' -Value $true
+
+    $Body = $Member | ConvertTo-Json 
+    $Verb = 'POST'
+    $Action = 'update'
+
+    Write-Debug "BODY: ${Body}" 
+
+    $Uri = "${Uri}/${Action}"
+    return CallInvictiAPI $Uri $Verb $Body $Credential
+}
 
 #--------[Script]---------------
 
@@ -71,14 +170,71 @@ Set-Location $scriptDir
 $startingDir = [System.Environment]::CurrentDirectory
 [System.Environment]::CurrentDirectory = $scriptDir
 
+# Handle basic credentials - user = token and password = key
+if ($Credential -eq [System.Management.Automation.PSCredential]::Empty)
+{
+  if (($null -eq $global:InvictiCred) -or ([System.Management.Automation.PSCredential]::Empty -eq $global:InvictiCred))
+  {
+    $Credential = Get-Credential -Message "Enter your API 'Token' and 'Key' as 'User Name' and 'Password'"
+    Set-Variable -Name 'InvictiCred' -Value $Credential -Scope global
+  }
+  else
+  {
+    $Credential = $global:InvictiCred
+  }
+}
+
+if (($null -ne $Member) -and ($null -eq $Verb))
+{
+  $Verb = 'POST'
+}
+elseif ($null -eq $Verb -or $Verb -eq '')
+{
+  $Verb = 'GET'
+}
 
 try
 {
-    # >>>>>> Insert script here.
+
+  if ($null -eq $Member)
+  {
+    $Body = ''
+  }
+  else {
+    $Body = $Member | ConvertTo-Json
+  }
+  
+  if ($null -ne $Email -and $null -eq $Member) {
+    $Member = Get-InvictiMember $Email "${BaseUrl}${ApiVersion}" $Verb $Body $Credential
+    if ($Action -eq 'getbyemail') { 
+      return $Member 
+    }
+  }
+
+  if ($Action -eq 'disablemember')
+  {
+    # $Member.State = 'Disabled'
+    # $Member | Add-Member -MemberType NoteProperty -Name 'AutoGeneratePassword' -Value $true
+
+    # $Body = $Member | ConvertTo-Json 
+    # $Verb = 'POST'
+    # $Action = 'update'
+
+    # Write-Debug "BODY: ${Body}" 
+
+    # $Uri = "${BaseUrl}${ApiVersion}/${Subject}/${Action}"
+    # return CallInvictiAPI $Uri $Verb $Body $Credential
+    return Disable-InvictiMember $Member "${BaseUrl}${ApiVersion}/${Subject}" $Credential
+  }
+  
+  $Uri = "${BaseUrl}${ApiVersion}/${Subject}/${Action}"
+  $Response = CallInvictiAPI $Uri $Verb $Body $Credential 
+  
+  return $Response
 }
 finally
 {
     Set-Location $startingLoc
     [System.Environment]::CurrentDirectory = $startingDir
-    Write-Output "Done. ET: $($stopwatch.Elapsed)"
+    Write-Verbose "Done. ET: $($stopwatch.Elapsed)"
 }
