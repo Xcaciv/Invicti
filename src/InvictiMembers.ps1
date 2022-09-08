@@ -15,7 +15,7 @@
   Author:         <Name>
   Creation Date:  <Date>
   Purpose/Change: Initial script development
-  
+
 .EXAMPLE
   <Example goes here. Repeat this attribute for more than one example>
 #>
@@ -25,7 +25,7 @@
 Param(
   [Parameter()]
   [ValidateSet('delete', 'deleteinvitation', 'get', 'getapitoken', 'getbyemail', 'getinvitation', 'gettimezones', 'invitationlist', 'list', 'new', 'newinvitation', 'sendinvitationemail', 'update', 'disablemember' )]
-  [string]$Action='list',
+  [string]$Action = 'list',
 
   [Parameter()]
   [int]$Id,
@@ -41,20 +41,20 @@ Param(
 
   [Parameter()]
   [string]
-  $BaseUrl='https://www.netsparkercloud.com/api/',
+  $BaseUrl = 'https://www.netsparkercloud.com/api/',
 
   [Parameter()]
   [ValidateSet('1.0')]
   [string]
-  $ApiVersion='1.0',
+  $ApiVersion = '1.0',
 
   [Parameter()]
   [string]
-  $Subject='members',
+  $Subject = 'members',
 
   [Parameter()]
   [string]
-  [ValidateSet('POST','GET')]
+  [ValidateSet('POST', 'GET')]
   $Verb,
 
   [Parameter()]
@@ -62,7 +62,8 @@ Param(
   $Credential = [System.Management.Automation.PSCredential]::Empty
 )
 
-function CallInvictiAPI {
+function CallInvictiAPI
+{
   [CmdletBinding()]
   Param(
     [Parameter(Mandatory)]
@@ -84,7 +85,7 @@ function CallInvictiAPI {
     $Credential = [System.Management.Automation.PSCredential]::Empty
   )
 
-  
+
   Write-Debug "calling ${Verb} :: ${Uri}"
 
   $Parameters = @{
@@ -99,7 +100,8 @@ function CallInvictiAPI {
   Invoke-RestMethod @Parameters
 }
 
-function Get-InvictiMember {
+function Get-InvictiMember
+{
   [CmdletBinding()]
   Param(
     [Parameter(Mandatory)]
@@ -129,7 +131,8 @@ function Get-InvictiMember {
   CallInvictiAPI $Uri $Verb $Body $Credential
 }
 
-function Disable-InvictiMember {
+function Disable-InvictiMember
+{
   [CmdletBinding()]
   Param(
     [Parameter(Mandatory)]
@@ -147,17 +150,17 @@ function Disable-InvictiMember {
     $Credential = [System.Management.Automation.PSCredential]::Empty
   )
 
-    $Member.State = 'Disabled'
-    $Member | Add-Member -MemberType NoteProperty -Name 'AutoGeneratePassword' -Value $true
+  $Member.State = 'Disabled'
+  $Member | Add-Member -MemberType NoteProperty -Name 'AutoGeneratePassword' -Value $true
 
-    $Body = ConvertTo-Json -Depth 10 -InputObject $Member
-    $Verb = 'POST'
-    $Action = 'update'
+  $Body = ConvertTo-Json -Depth 10 -InputObject $Member
+  $Verb = 'POST'
+  $Action = 'update'
 
-    Write-Debug "BODY: ${Body}" 
+  Write-Debug "BODY: ${Body}"
 
-    $Uri = "${Uri}/${Action}"
-    return CallInvictiAPI $Uri $Verb $Body $Credential
+  $Uri = "${Uri}/${Action}"
+  return CallInvictiAPI $Uri $Verb $Body $Credential
 }
 
 #--------[Script]---------------
@@ -176,7 +179,9 @@ $startingDir = [System.Environment]::CurrentDirectory
 # Handle basic credentials - user = token and password = key
 if ($Credential -eq [System.Management.Automation.PSCredential]::Empty)
 {
-  if (($null -eq $global:InvictiCred) -or ([System.Management.Automation.PSCredential]::Empty -eq $global:InvictiCred))
+  Write-Debug "Checking Cred"
+
+  if (!([boolean](Get-Variable "InvictiCred" -Scope Global -ErrorAction SilentlyContinue)))
   {
     $Credential = Get-Credential -Message "Enter your API 'Token' and 'Key' as 'User Name' and 'Password'"
     Set-Variable -Name 'InvictiCred' -Value $Credential -Scope global
@@ -198,35 +203,48 @@ elseif ($null -eq $Verb -or $Verb -eq '')
 
 try
 {
-  
+
   if ($null -eq $Member)
   {
     $Body = ''
   }
-  else {
+  else
+  {
     $Body = $Member | ConvertTo-Json
   }
 
-  if ($null -eq $DisableMemberList)
+  if ($null -ne $DisableMemberList)
   {
     $emailRegex = '\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*';
-    foreach($line in Get-Content -Path $DisableMemberList)
+    if (Test-Path -Path $DisableMemberList)
     {
-      if($line -match $emailRegex)
+      foreach ($line in Get-Content -Path $DisableMemberList)
       {
-        $Member = Get-InvictiMember $line "${BaseUrl}${ApiVersion}" $Verb $Body $Credential
-        $result = Disable-InvictiMember $Member "${BaseUrl}${ApiVersion}/${Subject}" $Credential
-        Write-Debug $result
-        Write-Verbose "Disabled ${line}"
+        if ($line -match $emailRegex)
+        {
+          try
+          {
+            $Member = Get-InvictiMember $line "${BaseUrl}${ApiVersion}" $Verb $Body $Credential
+            $result = Disable-InvictiMember $Member "${BaseUrl}${ApiVersion}/${Subject}" $Credential
+            Write-Debug $result
+            Write-Verbose "Disabled ${line}"
+          }
+          catch
+          {
+            Write-Verbose "Unable to Disable ${line}"
+          }
+        }
       }
     }
     return
   }
-  
-  if ($null -ne $Email -and $null -eq $Member) {
+
+  if ($null -ne $Email -and $null -eq $Member)
+  {
     $Member = Get-InvictiMember $Email "${BaseUrl}${ApiVersion}" $Verb $Body $Credential
-    if ($Action -eq 'getbyemail') { 
-      return $Member 
+    if ($Action -eq 'getbyemail')
+    {
+      return $Member
     }
   }
 
@@ -235,14 +253,20 @@ try
   {
     return Disable-InvictiMember $Member "${BaseUrl}${ApiVersion}/${Subject}" $Credential
   }
-  
+
   # normal function
   $Uri = "${BaseUrl}${ApiVersion}/${Subject}/${Action}"
-  return CallInvictiAPI $Uri $Verb $Body $Credential 
+  return CallInvictiAPI $Uri $Verb $Body $Credential
+}
+catch
+{
+  Write-Error ($_.Exception | Format-List -Force | Out-String) -ErrorAction Continue
+  Write-Error ($_.InvocationInfo | Format-List -Force | Out-String) -ErrorAction Continue
+  throw
 }
 finally
 {
-    Set-Location $startingLoc
-    [System.Environment]::CurrentDirectory = $startingDir
-    Write-Verbose "Done. ET: $($stopwatch.Elapsed)"
+  Set-Location $startingLoc
+  [System.Environment]::CurrentDirectory = $startingDir
+  Write-Verbose "Done. ET: $($stopwatch.Elapsed)"
 }
