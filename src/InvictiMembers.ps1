@@ -59,7 +59,10 @@ Param(
 
   [Parameter()]
   [System.Management.Automation.PSCredential]
-  $Credential = [System.Management.Automation.PSCredential]::Empty
+  $Credential = [System.Management.Automation.PSCredential]::Empty,
+
+  [Parameter()]
+  [Switch]$CredentialPrompt
 )
 
 function CallInvictiAPI
@@ -194,7 +197,7 @@ if ($Credential -eq [System.Management.Automation.PSCredential]::Empty)
 {
   Write-Debug "Checking Cred"
 
-  if (!([boolean](Get-Variable "InvictiCred" -Scope Global -ErrorAction SilentlyContinue)))
+  if (!([boolean](Get-Variable "InvictiCred" -Scope Global -ErrorAction SilentlyContinue)) -or $CredentialPrompt)
   {
     Write-Debug "Prompting credentials"
     $Credential = Get-Credential -Message "Enter your API 'Token' and 'Key' as 'User Name' and 'Password'"
