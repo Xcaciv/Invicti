@@ -1,4 +1,4 @@
-#Requires -Version 4
+#Requires -Version 5
 <#
 .SYNOPSIS
   Do things with Invicti members
@@ -92,7 +92,7 @@ function CallInvictiAPI
     Method = $Verb
     Uri = $Uri
     ContentType = 'application/json'
-    Authentication = "Basic"
+    # Authentication = "Basic"
     Credential = $Credential
   }
 
@@ -157,7 +157,7 @@ function Disable-InvictiMember
   if ($Member.State -eq 'Disabled')
   {
     $Name = $Member.Name
-    Write-Verbose "User ${Name} already Disabled"
+    Write-Verbose "User ${Name} **ALREADY DISABLED**"
     return
   }
   else
