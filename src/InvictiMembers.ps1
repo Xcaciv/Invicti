@@ -37,7 +37,7 @@ Param(
   [Object]$Member,
 
   [Parameter()]
-  [string]$DisableMemberList,
+  [string]$DisableMemberList = '',
 
   [Parameter()]
   [string]
@@ -76,7 +76,7 @@ function CallInvictiAPI
     $Verb,
 
     [Parameter()]
-    [string]$JsonBody,
+    [string]$JsonBody = $null,
 
     [Parameter()]
     [ValidateNotNull()]
@@ -86,15 +86,19 @@ function CallInvictiAPI
   )
 
 
-  Write-Debug "calling ${Verb} :: ${Uri}"
+  Write-Debug "Calling ${Verb} :: ${Uri}"
 
   $Parameters = @{
     Method = $Verb
     Uri = $Uri
-    Body = $JsonBody
     ContentType = 'application/json'
     Authentication = "Basic"
     Credential = $Credential
+  }
+
+  if ($Verb -eq 'POST')
+  {
+    $Parameters | Add-Member -MemberType NoteProperty -Name 'Body' -Value $JsonBody
   }
 
   Invoke-RestMethod @Parameters
@@ -150,8 +154,17 @@ function Disable-InvictiMember
     $Credential = [System.Management.Automation.PSCredential]::Empty
   )
 
-  $Member.State = 'Disabled'
-  $Member | Add-Member -MemberType NoteProperty -Name 'AutoGeneratePassword' -Value $true
+  if ($Member.State -eq 'Disabled')
+  {
+    $Name = $Member.Name
+    Write-Verbose "User ${Name} already Disabled"
+    return
+  }
+  else
+  {
+    $Member.State = 'Disabled'
+    $Member | Add-Member -MemberType NoteProperty -Name 'AutoGeneratePassword' -Value $true
+  }
 
   $Body = ConvertTo-Json -Depth 10 -InputObject $Member
   $Verb = 'POST'
@@ -183,21 +196,25 @@ if ($Credential -eq [System.Management.Automation.PSCredential]::Empty)
 
   if (!([boolean](Get-Variable "InvictiCred" -Scope Global -ErrorAction SilentlyContinue)))
   {
+    Write-Debug "Prompting credentials"
     $Credential = Get-Credential -Message "Enter your API 'Token' and 'Key' as 'User Name' and 'Password'"
     Set-Variable -Name 'InvictiCred' -Value $Credential -Scope global
   }
   else
   {
+    Write-Debug "Loading Global Credentials"
     $Credential = $global:InvictiCred
   }
 }
 
 if (($null -ne $Member) -and ($null -eq $Verb))
 {
+  Write-Debug "Member set, forcing POST"
   $Verb = 'POST'
 }
 elseif ($null -eq $Verb -or $Verb -eq '')
 {
+  Write-Debug "No verb, defaulting to GET"
   $Verb = 'GET'
 }
 
@@ -210,14 +227,17 @@ try
   }
   else
   {
+    Write-Debug "Converting Member to JsonBody"
     $Body = $Member | ConvertTo-Json
   }
 
-  if ($null -ne $DisableMemberList)
+  if (($null -ne $DisableMemberList) -and ($DisableMemberList -ne ''))
   {
+    Write-Verbose "Disabled Member list not empty"
     $emailRegex = '\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*';
     if (Test-Path -Path $DisableMemberList)
     {
+      Write-Output "Loading Disable Member List"
       foreach ($line in Get-Content -Path $DisableMemberList)
       {
         if ($line -match $emailRegex)
@@ -236,11 +256,17 @@ try
         }
       }
     }
+    else {
+      Write-Output "Unable to find Disable Member List"
+    }
     return
+
   }
 
-  if ($null -ne $Email -and $null -eq $Member)
+  # load member function
+  if (($null -ne $Email -and $Email -ne '') -and ($null -eq $Member))
   {
+    Write-Verbose "Loading member"
     $Member = Get-InvictiMember $Email "${BaseUrl}${ApiVersion}" $Verb $Body $Credential
     if ($Action -eq 'getbyemail')
     {
@@ -256,7 +282,8 @@ try
 
   # normal function
   $Uri = "${BaseUrl}${ApiVersion}/${Subject}/${Action}"
-  return CallInvictiAPI $Uri $Verb $Body $Credential
+  CallInvictiAPI $Uri $Verb $Body $Credential
+  return $Member
 }
 catch
 {
