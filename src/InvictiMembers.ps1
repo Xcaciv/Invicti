@@ -1,23 +1,44 @@
 #Requires -Version 5
 <#
 .SYNOPSIS
-  Do things with Invicti members
+  Do things with Invicti members, most specifically disable Members
 .DESCRIPTION
   Mass edit members
-.PARAMETER action
+.PARAMETER Action
     <Brief description of parameter input required. Repeat this attribute if required>
+.PARAMETER Id
+    <Brief description of parameter input required. Repeat this attribute if required>
+.PARAMETER Email
+    <Brief description of parameter input required. Repeat this attribute if required>
+.PARAMETER Member
+    <Brief description of parameter input required. Repeat this attribute if required>
+.PARAMETER DisableMemberList
+    <Brief description of parameter input required. Repeat this attribute if required>
+.PARAMETER BaseUrl
+    override
+.PARAMETER ApiVersion
+    Version of API to be used
+.PARAMETER Subject
+    override 'members' to call other endpoints
+.PARAMETER Verb
+    OVERRIDE HTTP Verb
+.PARAMETER Credential
+    PSCredential for authentication to API
+.PARAMETER CredentialPrompt
+    Toggle force prompt for credentials
 .INPUTS
   <Inputs if any, otherwise state None>
 .OUTPUTS
-  <Outputs if any, otherwise state None - example: Log file stored in C:\Windows\Temp\<name>.log>
+  To Screen
 .NOTES
   Version:        1.0
-  Author:         <Name>
-  Creation Date:  <Date>
+  Author:         Alton Crossley
+  Creation Date:  2022-09-26
   Purpose/Change: Initial script development
 
 .EXAMPLE
-  <Example goes here. Repeat this attribute for more than one example>
+  <Script> -Verbose
+  Lists members
 #>
 
 
